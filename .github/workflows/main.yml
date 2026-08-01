@@ -8,7 +8,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -19,16 +18,37 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.2'
 
+      - name: Locate the Gradle project
+        id: locate
+        run: |
+          echo "Repo contents:"
+          find . -maxdepth 4 -not -path '*/.git*'
+          FOUND=$(find . -name settings.gradle -o -name settings.gradle.kts | head -n 1)
+          PROJECT_DIR=$(dirname "$FOUND")
+          echo "Found settings.gradle in: $PROJECT_DIR"
+          echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+
       - name: Build Debug APK
-        run: gradle assembleDebug
+        working-directory: ${{ steps.locate.outputs.project_dir }}
+        run: gradle assembleDebug --stacktrace
+
+      - name: Find the built APK
+        id: findapk
+        run: |
+          APK_PATH=$(find . -name "app-debug.apk" | head -n 1)
+          echo "Found APK at: $APK_PATH"
+          echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: ShakeWallpaper-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: ${{ steps.findapk.outputs.apk_path }}
